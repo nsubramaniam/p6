@@ -11,6 +11,10 @@ struct _MFS_inode_t {
 	void* dataPtr[10];	
 }inode[4096];
 
+struct directoryData {
+	MFS_DirEnt_t *dirData;
+};
+
 struct MFS_FileSystem {
 	void* inodeMap[MFS_BLOCK_SIZE];
 	void* dataMap[MFS_BLOCK_SIZE];	
@@ -25,11 +29,12 @@ struct MFS_FileSystem {
 		inodeMap[0] = 1;
 		dataMap[0] = 1;
 	}
-	void initializeRootDataNode() {
-							
-	}
 	void assignAddressDataNode(int dnum, void* ptr) {
 		dataMap[dnum] = ptr;
+	}
+	void initializeRootDataNode() {
+		void* ptr = malloc(16*sizeof(MFS_DirEnt_t));							
+		assignAddressDataNode(0, ptr);
 	}
 	void assignAddressINode(int inum, void* ptr) {
 		inodeMap[inum] = ptr;
