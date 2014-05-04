@@ -34,6 +34,7 @@ int MFS_Lookup(int pinum, char* name) {
 		} else {
 			printf("Client timed out\n");
 		}
+	}
 }
 
 int MFS_Stat(int inum, MFS_Stat_t *m) {
@@ -58,20 +59,106 @@ int MFS_Stat(int inum, MFS_Stat_t *m) {
 			return details->returnVal;
 		} else {
 			printf("Client timed out\n");
+		}
+	}
 }
 
 int MFS_Write(int inum, char* buffer, int block) {
+	details->dirEnt->inum = inum;
+	strcpy(details->name,buffer);
+	details->block = block;
+	strcpy(details->operation,"write");
 
+    	rc = UDP_Write(sd, &addr, &details, sizeof(MFS_Details));
+	if(rc > 0) {
+		fd_set r;
+		FD_ZERO(&r);
+		FD_SET(sd, &r);
+		
+		struct timeval t;
+		t.tv_sec = 10;
+		t.tv_usec = 0;
+		rc = select(sd + 1, &r, NULL, NULL, &t);
+		if (rc > 0) {
+			rc = UDP_Read(sd, &addr2, details, sizeof(MFS_Details));
+			return details->returnVal;
+		} else {
+			printf("Client timed out\n");
+		}
+	}
 }
 
 int MFS_Read(int inum, char* buffer, int block) {
+	details->dirEnt->inum = inum;
+	strcpy(details->name,buffer);
+	details->block = block;
+	strcpy(details->operation,"read");
 
-}
+    	rc = UDP_Write(sd, &addr, &details, sizeof(MFS_Details));
+	if(rc > 0) {
+		fd_set r;
+		FD_ZERO(&r);
+		FD_SET(sd, &r);
+		
+		struct timeval t;
+		t.tv_sec = 10;
+		t.tv_usec = 0;
+		rc = select(sd + 1, &r, NULL, NULL, &t);
+		if (rc > 0) {
+			rc = UDP_Read(sd, &addr2, details, sizeof(MFS_Details));
+			return details->returnVal;
+		} else {
+			printf("Client timed out\n");
+		}
+	}
+}	
 
 int MFS_Creat(int pinum, int type, char* name) {
-
+	details->dirEnt->inum = pinum;
+	strcpy(details->dirEnt->name,name);
+	details->stat->type = type;
+	strcpy(details->operation,"create");
+    	
+	rc = UDP_Write(sd, &addr, &details, sizeof(MFS_Details));
+	if(rc > 0) {
+		fd_set r;
+		FD_ZERO(&r);
+		FD_SET(sd, &r);
+		
+		struct timeval t;
+		t.tv_sec = 10;
+		t.tv_usec = 0;
+		rc = select(sd + 1, &r, NULL, NULL, &t);
+		if (rc > 0) {
+			rc = UDP_Read(sd, &addr2, details, sizeof(MFS_Details));
+			return details->returnVal;
+		} else {
+			printf("Client timed out\n");
+		}
+	}
 }
 
 int MFS_Unlink(int pinum, char* name) {
+	details->dirEnt->inum = pinum;
+	strcpy(details->dirEnt->name,name);
+	strcpy(details->operation,"unlink");
+    	
+	rc = UDP_Write(sd, &addr, &details, sizeof(MFS_Details));
+	if(rc > 0) {
+		fd_set r;
+		FD_ZERO(&r);
+		FD_SET(sd, &r);
+		
+		struct timeval t;
+		t.tv_sec = 10;
+		t.tv_usec = 0;
+		rc = select(sd + 1, &r, NULL, NULL, &t);
+		if (rc > 0) {
+			rc = UDP_Read(sd, &addr2, details, sizeof(MFS_Details));
+			return details->returnVal;
+		} else {
+			printf("Client timed out\n");
 
+		}
+	}
 }
