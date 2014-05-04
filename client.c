@@ -1,11 +1,12 @@
 #include <stdio.h>
-#include<sys/select.h>
-#include<sys/time.h>
+#include <sys/select.h>
+#include <sys/time.h>
 #include "udp.h"
+#include "mfs.h"
 
 #define BUFFER_SIZE (4096)
 char buffer[BUFFER_SIZE];
-
+/*
 int
 main(int argc, char *argv[])
 {
@@ -14,12 +15,6 @@ main(int argc, char *argv[])
 		printf("Usage: client server-name server-port client-port\n");
 		exit(1);
 	}
-	int sd = UDP_Open(atoi(argv[3])); //communicate through specified port 
-	assert(sd > -1);
-
-	struct sockaddr_in addr, addr2;
-	int rc = UDP_FillSockAddr(&addr, argv[1], atoi(argv[2])); //contact server at specified port
-	assert(rc == 0);
 
 	char message[BUFFER_SIZE];
 	sprintf(message, "hello world");
@@ -44,5 +39,4 @@ main(int argc, char *argv[])
 
 	return 0;
 }
-
-
+*/
