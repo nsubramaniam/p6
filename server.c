@@ -2,12 +2,17 @@
 #include <unistd.h>
 #include "udp.h"
 #include "mfs.h"
+
+#define BLOCK_SIZE 4096
+#define BLOCKS 4096
 #define BUFFER_SIZE (BLOCK_SIZE)
+#define DIRENTRIES 16
+#define BLOCKENTRIES 10
 
 int fd;
 char ibmp[BLOCK_SIZE],dbmp[BLOCK_SIZE];
 MFS_Stat_t stat[BLOCK_SIZE];
-int metadata;
+int metadataSize;
 
 int server_MFS_Init(char * fname)
 {
@@ -26,14 +31,14 @@ int server_MFS_Init(char * fname)
 	stat[0].size = BLOCK_SIZE;
 	stat[0].blocks = 1;
 
-	MFS_DirEnt_t dirDetails[16];
+	MFS_DirEnt_t dirDetails[DIRENTRIES];
 	dirDetails[0].inum = -1;
 	strcpy(dirDetails[0].name,"..");
 
 	dirDetails[1].inum = 0;
 	strcpy(dirDetails[0].name,".");
 
-	for(i=2;i<16;i++)
+	for(i=2;i<DIRENTRIES;i++)
 	{
 		dirDetails[i].inum = -1;
 	}
@@ -42,8 +47,8 @@ int server_MFS_Init(char * fname)
 	write(fd,(void *)ibmp,sizeof(char)*BLOCK_SIZE);
 	write(fd,(void *)dbmp,sizeof(char)*BLOCK_SIZE);
 	write(fd,(void *)stat,sizeof(MFS_Stat_t)*BLOCK_SIZE);
-	write(fd,(void *)dirDetails,sizeof(MFS_DirEnt_t)*16);
-	fsync();
+	write(fd,(void *)dirDetails,sizeof(MFS_DirEnt_t)*DIRENTRIES);
+	fsync(fd);
 
 	return 1;	
 }
@@ -53,12 +58,20 @@ int server_MFS_Lookup(int pinum, char *name)
 	int i,j;
 	for(i=0;i<BLOCK_SIZE;i++)
 	{
-		if(stat[i].inum == pinum)
+		if(dbmp[i])
 		{
-			for(j=0;j<16;j++)
+			MFS_DirEnt_t * ptr = (MFS_DirEnt_t *)malloc(sizeof(MFS_DirEnt_t *));
+			for(j=0;j<DIRENTRIES;j++)
 			{
-				if(!strcmp(stat[i].dirDetails[j],"name"))
-					return stat[i].dirDetails[j].inum;
+				int offset = metadataSize + i * BLOCK_SIZE + j * sizeof(MFS_DirEnt_t);
+				lseek(fd,offset,SEEK_SET);
+				if(read(fd,ptr,sizeof(MFS_DirEnt_t) == sizeof(MFS_DirEnt_t)))
+				{
+					if(!strcmp(ptr->name,name))
+						return ptr->inum;
+				}
+				else
+					break;
 			}
 		}
 	}
@@ -67,16 +80,28 @@ int server_MFS_Lookup(int pinum, char *name)
 
 int server_MFS_Stat(int inum, MFS_Stat_t *m)
 {
-	int i;
+	int i,j;
 	for(i=0;i<BLOCK_SIZE;i++)
 	{
-		if(stat[i].inum == pinum)
+		if(dbmp[i])
 		{
-			int offset = metadata + BLOCK_SIZE * pinum;
-			lseek(fd,offset,SEEK_SET);
-			read(fd,m,sizeof(MFS_stat_t));
-			return 0;
-		}
+			MFS_DirEnt_t * ptr = (MFS_DirEnt_t *)malloc(sizeof(MFS_DirEnt_t *));
+			for(j=0;j<DIRENTRIES;j++)
+			{
+				int offset = metadataSize + i * BLOCK_SIZE + j * sizeof(MFS_DirEnt_t);
+				lseek(fd,offset,SEEK_SET);
+				if(read(fd,ptr,sizeof(MFS_DirEnt_t) == sizeof(MFS_DirEnt_t)))
+				{
+					if(ptr->inum == inum)
+					{
+						m->type = stat[i].type;
+						m->size = stat[i].size;
+						m->blocks = stat[i].blocks;
+						return 0;
+					}
+				}	
+			}
+		}	
 	}
 
 	return -1;
@@ -84,38 +109,82 @@ int server_MFS_Stat(int inum, MFS_Stat_t *m)
 
 int server_MFS_Write(int inum, char *buffer, int block)
 {
-	int i;
-	for(i=0;i<BLOCK_SIZE;i++)
+	int i,j,k;
+
+	for(i=0;i<BLOCKS;i++)
 	{
-		if(stat[i].inum == pinum && stat[i].type == MFS_REGULAR_FILE)
+		if(ibmp[i] && stat[i].type == MFS_DIRECTORY)
 		{
-			int offset = metadata + BLOCK_SIZE*inum + block;
-			lseek(fd,offset,SEEK_SET);
-			write(fd,buffer,BLOCK_SIZE);
-			fsync();
-			return 0;
+			for(j=0;j<DIRENTRIES;j++)
+			{	
+				MFS_DirEnt_t * ptr = (MFS_DirEnt_t *)malloc(sizeof(MFS_DirEnt_t *));
+				int offset = metadataSize + i * BLOCK_SIZE + j * sizeof(MFS_Stat_t);
+				lseek(fd,offset,SEEK_SET);
+				if(read(fd,ptr,sizeof(MFS_DirEnt_t)) == sizeof(MFS_DirEnt_t));
+				{
+					if(ptr->inum == inum && stat[i].type == MFS_REGULAR_FILE)
+					{
+						for(k=0;k<BLOCKS;k++)
+						{	
+							if(dbmp[k] == 0)
+							{
+								offset = metadataSize + k * BLOCK_SIZE;
+								lseek(fd,offset,SEEK_SET);
+								write(fd,buffer,BLOCK_SIZE);
+						
+								stat[k].size += BLOCK_SIZE;
+								stat[k].blocks += 1;
+								stat[k].type = MFS_REGULAR_FILE;
+								stat[k].blk[block] = 1;					
+				
+								dbmp[k]=1;
+								ibmp[k]=1;
+
+								fsync(fd);							
+								return 0;
+							}
+						}
+					}
+				}
+			}
 		}
 	}
+
 	return -1;
 }
 
 int server_MFS_Read(int inum, char * buffer, int block)
 {
-	int i;
-	for(i=0;i<BLOCK_SIZE;i++)
+	int i,j;
+
+	for(i=0;i<BLOCKS;i++)
 	{
-		if(stat[i].inum == pinum && stat[i].type == MFS_REGULAR_FILE)
+		if(ibmp[i] && stat[i].type == MFS_DIRECTORY)
 		{
-			int offset = metadata + BLOCK_SIZE*inum + block;
-			lseek(fd,offset,SEEK_SET);
-			read(fd,buffer,BLOCK_SIZE);
-			fsync();
-			return 0;
+			for(j=0;j<DIRENTRIES;j++)
+			{	
+				MFS_DirEnt_t * ptr = (MFS_DirEnt_t *)malloc(sizeof(MFS_DirEnt_t *));
+				int offset = metadataSize + i * BLOCK_SIZE + j * sizeof(MFS_Stat_t);
+				lseek(fd,offset,SEEK_SET);
+				if(read(fd,ptr,sizeof(MFS_DirEnt_t)) == sizeof(MFS_DirEnt_t));
+				{
+					if(ptr->inum == inum && stat[i].type == MFS_REGULAR_FILE && stat[i].blk[block])
+					{
+						offset = metadataSize + inum * BLOCK_SIZE;
+						lseek(fd,offset,SEEK_SET);
+						read(fd,buffer,BLOCK_SIZE);
+						
+						return 0;
+					}
+				}
+			}
 		}
 	}
+
 	return -1;
 }
 
+/*
 int server_MFS_Creat(int pinum, int type, char *name)
 {
 	int i,j;
@@ -139,36 +208,50 @@ int server_MFS_Creat(int pinum, int type, char *name)
 		}
 	}
 
-	fsync();
+	fsync(fd);
 	return -1;
 }
+*/
 
 int server_MFS_Unlink(int pinum, char *name)
 {
-	int i,j;
-	for(i=0;i<BLOCK_SIZE;i++)
+	int i,j,k;
+	for(i=0;i<BLOCKS;i++)
 	{
-		if(stat[i].inum == pinum)
+		if(ibmp[i])
 		{
-			int offset = metadata + BLOCK_SZIE * pinum;
-			lseek(fd,offset,SEEK_SET);
-			for(j=0;j<16;j++)
+			for(j=0;j<DIRENTRIES;j++)
 			{
-				MFS_DirEnt_t * ptr;
-				read(fd,ptr,sizeof(MFS_DirEnt_t));
-				if(!strcmp(ptr->name,name))
+				MFS_DirEnt_t * ptr = (MFS_DirEnt_t *)malloc(sizeof(MFS_DirEnt_t *));
+				int offset = metadataSize + i * BLOCK_SIZE + j * sizeof(MFS_Stat_t);
+				lseek(fd,offset,SEEK_SET);
+				if(read(fd,ptr,sizeof(MFS_DirEnt_t)) == sizeof(MFS_DirEnt_t));
 				{
-					int inum = ptr->inum;
-					int index = inum/BLOCK_SIZE;
-					ibmp[index] = 0;	
-					dbmp[index] = 0;
-					//Do something about stat?		
+					if(ptr->inum == pinum) 
+					{
+						MFS_DirEnt_t * dirEntry = (MFS_DirEnt_t *)malloc(sizeof(MFS_DirEnt_t));
+						dirEntry->inum = -1;
+						
+						for(k=0;k<DIRENTRIES;k++)	
+						{
+							offset = metadataSize + pinum * BLOCK_SIZE + k * sizeof(MFS_DirEnt_t);
+							lseek(fd,offset,SEEK_SET);
+							read(fd,ptr,sizeof(MFS_DirEnt_t));
+							if(!strcmp(ptr->name,name))
+							{
+								lseek(fd,offset,SEEK_SET);
+								write(fd,dirEntry,sizeof(MFS_DirEnt_t));
+	
+								fsync(fd);
+								return 0;
+							}
+						}
+					}
 				}
 			}
 		}
 	}
 	
-	fsync();
 	return -1;
 }
 
@@ -182,20 +265,19 @@ int main(int argc, char *argv[]) {
 	int sd = UDP_Open(portid); 
 	assert(sd > -1);
 	
-	char filename[255];
 	server_MFS_Init(fileSysImg);
 	
-	MFS_Details details;	
-	metdata = 16*(sizeof(char) + sizeof(char) + sizeof(MFS_Stat_t));
+	MFS_Details * details = (MFS_Details *)malloc(sizeof(MFS_Details));	
+	metadataSize = DIRENTRIES*(sizeof(char) + sizeof(char) + sizeof(MFS_Stat_t));
 
 	printf("waiting in loop\n");
 	while (1) {
 		struct sockaddr_in s;
-		int rc = UDP_Read(sd, &s, &details, sizeof(MFS_Details)); //read message buffer from port sd
+		int rc = UDP_Read(sd, &s, (char *)&details, sizeof(MFS_Details)); //read message buffer from port sd
 		if (rc > 0) {
 		if(!strcmp(details->operation,"lookup"))
 		{
-			details->returnVal = server_MFS_Lookup(details->dirEnt->inum, &details->dirEnt->name);
+			details->returnVal = server_MFS_Lookup(details->dirEnt->inum, details->dirEnt->name);
 		}
 		else if(!strcmp(details->operation,"stat"))
 		{
@@ -209,16 +291,18 @@ int main(int argc, char *argv[]) {
 		{
 			details->returnVal = server_MFS_Read(details->dirEnt->inum, details->dirEnt->name, details->block);
 		}
+		/*
 		else if(!strcmp(details->operation,"create"))
 		{
 			details->returnVal = server_MFS_Creat(details->dirEnt->inum, details->stat->type, details->dirEnt->type);
 		}
+		*/
 		else if(!strcmp(details->operation,"unlink"))
 		{
 			details->returnVal = server_MFS_Unlink(details->dirEnt->inum, details->dirEnt->name);
 		}
 
-		rc = UDP_Write(sd, &s, &details, sizeof(MFS_Details)); //write message buffer to port sd
+		rc = UDP_Write(sd, &s, (char *)&details, sizeof(MFS_Details)); //write message buffer to port sd
 		}
 	}
 	return 0;

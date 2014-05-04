@@ -10,6 +10,7 @@ typedef struct __MFS_Stat_t {
     int type;   // MFS_DIRECTORY or MFS_REGULAR
     int size;   // bytes
     int blocks; // number of blocks allocated to file
+    int blk[10];
     // note: no permissions, access times, etc.
 } MFS_Stat_t;
 

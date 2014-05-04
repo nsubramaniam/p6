@@ -6,6 +6,12 @@
 
 #define BUFFER_SIZE (4096)
 char buffer[BUFFER_SIZE];
+
+int main(int argc, char *argv[])
+{
+
+	return 0;
+}
 /*
 int
 main(int argc, char *argv[])
