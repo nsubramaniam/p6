@@ -139,6 +139,7 @@ int server_MFS_Creat(int pinum, int type, char *name)
 		}
 	}
 
+	fsync();
 	return -1;
 }
 
@@ -166,7 +167,8 @@ int server_MFS_Unlink(int pinum, char *name)
 			}
 		}
 	}
-
+	
+	fsync();
 	return -1;
 }
 
