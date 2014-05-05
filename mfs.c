@@ -11,6 +11,8 @@ int MFS_Init(char* hostname, int port) {
 
 	rc = UDP_FillSockAddr(&addr, hostname, port); //contact server at specified port
 	assert(rc == 0);
+
+	return 0;
 }
 
 int MFS_Lookup(int pinum, char* name) {
@@ -18,7 +20,7 @@ int MFS_Lookup(int pinum, char* name) {
 	strcpy(details->dirEnt->name,name);
 	strcpy(details->operation,"lookup");
     	
-	rc = UDP_Write(sd, &addr, &details, sizeof(MFS_Details));
+	rc = UDP_Write(sd, &addr, (char *)&details, sizeof(MFS_Details));
 	if(rc > 0) {
 		fd_set r;
 		FD_ZERO(&r);
@@ -29,12 +31,14 @@ int MFS_Lookup(int pinum, char* name) {
 		t.tv_usec = 0;
 		rc = select(sd + 1, &r, NULL, NULL, &t);
 		if (rc > 0) {
-			rc = UDP_Read(sd, &addr2, details, sizeof(MFS_Details));
+			rc = UDP_Read(sd, &addr2, (char *)details, sizeof(MFS_Details));
 			return details->returnVal;
 		} else {
 			printf("Client timed out\n");
 		}
 	}
+
+	return -1;
 }
 
 int MFS_Stat(int inum, MFS_Stat_t *m) {
@@ -44,7 +48,7 @@ int MFS_Stat(int inum, MFS_Stat_t *m) {
 	details->stat->blocks = m->blocks;
 	strcpy(details->operation,"stat");
 	
-    	rc = UDP_Write(sd, &addr, &details, sizeof(MFS_Details));
+    	rc = UDP_Write(sd, &addr, (char *)&details, sizeof(MFS_Details));
 	if(rc > 0) {
 		fd_set r;
 		FD_ZERO(&r);
@@ -55,21 +59,23 @@ int MFS_Stat(int inum, MFS_Stat_t *m) {
 		t.tv_usec = 0;
 		rc = select(sd + 1, &r, NULL, NULL, &t);
 		if (rc > 0) {
-			rc = UDP_Read(sd, &addr2, details, sizeof(MFS_Details));
+			rc = UDP_Read(sd, &addr2, (char *)details, sizeof(MFS_Details));
 			return details->returnVal;
 		} else {
 			printf("Client timed out\n");
 		}
 	}
+
+	return -1;
 }
 
 int MFS_Write(int inum, char* buffer, int block) {
 	details->dirEnt->inum = inum;
-	strcpy(details->name,buffer);
+	strcpy(details->dirEnt->name,buffer);
 	details->block = block;
 	strcpy(details->operation,"write");
 
-    	rc = UDP_Write(sd, &addr, &details, sizeof(MFS_Details));
+    	rc = UDP_Write(sd, &addr, (char *)&details, sizeof(MFS_Details));
 	if(rc > 0) {
 		fd_set r;
 		FD_ZERO(&r);
@@ -80,21 +86,23 @@ int MFS_Write(int inum, char* buffer, int block) {
 		t.tv_usec = 0;
 		rc = select(sd + 1, &r, NULL, NULL, &t);
 		if (rc > 0) {
-			rc = UDP_Read(sd, &addr2, details, sizeof(MFS_Details));
+			rc = UDP_Read(sd, &addr2, (char *)details, sizeof(MFS_Details));
 			return details->returnVal;
 		} else {
 			printf("Client timed out\n");
 		}
 	}
+
+	return -1;
 }
 
 int MFS_Read(int inum, char* buffer, int block) {
 	details->dirEnt->inum = inum;
-	strcpy(details->name,buffer);
+	strcpy(details->dirEnt->name,buffer);
 	details->block = block;
 	strcpy(details->operation,"read");
 
-    	rc = UDP_Write(sd, &addr, &details, sizeof(MFS_Details));
+    	rc = UDP_Write(sd, &addr, (char *)&details, sizeof(MFS_Details));
 	if(rc > 0) {
 		fd_set r;
 		FD_ZERO(&r);
@@ -105,12 +113,14 @@ int MFS_Read(int inum, char* buffer, int block) {
 		t.tv_usec = 0;
 		rc = select(sd + 1, &r, NULL, NULL, &t);
 		if (rc > 0) {
-			rc = UDP_Read(sd, &addr2, details, sizeof(MFS_Details));
+			rc = UDP_Read(sd, &addr2, (char *)details, sizeof(MFS_Details));
 			return details->returnVal;
 		} else {
 			printf("Client timed out\n");
 		}
 	}
+
+	return -1;
 }	
 
 int MFS_Creat(int pinum, int type, char* name) {
@@ -119,7 +129,7 @@ int MFS_Creat(int pinum, int type, char* name) {
 	details->stat->type = type;
 	strcpy(details->operation,"create");
     	
-	rc = UDP_Write(sd, &addr, &details, sizeof(MFS_Details));
+	rc = UDP_Write(sd, &addr, (char *)&details, sizeof(MFS_Details));
 	if(rc > 0) {
 		fd_set r;
 		FD_ZERO(&r);
@@ -130,12 +140,14 @@ int MFS_Creat(int pinum, int type, char* name) {
 		t.tv_usec = 0;
 		rc = select(sd + 1, &r, NULL, NULL, &t);
 		if (rc > 0) {
-			rc = UDP_Read(sd, &addr2, details, sizeof(MFS_Details));
+			rc = UDP_Read(sd, &addr2, (char *)details, sizeof(MFS_Details));
 			return details->returnVal;
 		} else {
 			printf("Client timed out\n");
 		}
 	}
+
+	return -1;
 }
 
 int MFS_Unlink(int pinum, char* name) {
@@ -143,7 +155,7 @@ int MFS_Unlink(int pinum, char* name) {
 	strcpy(details->dirEnt->name,name);
 	strcpy(details->operation,"unlink");
     	
-	rc = UDP_Write(sd, &addr, &details, sizeof(MFS_Details));
+	rc = UDP_Write(sd, &addr, (char *)&details, sizeof(MFS_Details));
 	if(rc > 0) {
 		fd_set r;
 		FD_ZERO(&r);
@@ -154,11 +166,13 @@ int MFS_Unlink(int pinum, char* name) {
 		t.tv_usec = 0;
 		rc = select(sd + 1, &r, NULL, NULL, &t);
 		if (rc > 0) {
-			rc = UDP_Read(sd, &addr2, details, sizeof(MFS_Details));
+			rc = UDP_Read(sd, &addr2, (char *)details, sizeof(MFS_Details));
 			return details->returnVal;
 		} else {
 			printf("Client timed out\n");
 
 		}
 	}
+
+	return -1;
 }
