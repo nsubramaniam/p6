@@ -36,7 +36,7 @@ int server_MFS_Init(char * fname)
 	strcpy(dirDetails[0].name,"..");
 
 	dirDetails[1].inum = 0;
-	strcpy(dirDetails[0].name,".");
+	strcpy(dirDetails[1].name,".");
 
 	for(i=2;i<DIRENTRIES;i++)
 	{

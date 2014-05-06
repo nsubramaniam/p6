@@ -22,7 +22,7 @@ typedef struct __MFS_DirEnt_t {
 typedef struct __MFS_Details {
 	MFS_DirEnt_t * dirEnt;
 	MFS_Stat_t * stat;
-	char operation[255];
+	char operation[255]; // Lookup, init, stat, write, read, unlink, create
 	int block;
 	int returnVal;
 } MFS_Details;
