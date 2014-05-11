@@ -1,4 +1,8 @@
 #include "mfs.h"
+#include <stdio.h>
+#include <sys/select.h>
+#include <sys/time.h>
+#include "udp.h"
 
 int sd, rc;
 struct sockaddr_in addr, addr2;

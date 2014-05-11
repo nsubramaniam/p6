@@ -1,21 +1,25 @@
-CC   = gcc
+CC   = gcc 
 OPTS = -Wall
+CFLAGS=-g 
+all: server 
 
-all: server client
+client.o: client.c
+	$(CC) $(CFLAFS) -c client.c 
 
-# this generates the target executables
-server: server.o udp.o
-	$(CC) -o server server.o udp.o 
+mfs.o: mfs.c
+	$(CC) $(CFLAGS) -c -fpic mfs.c 
 
-client: client.o udp.o
-	$(CC) -o client client.o udp.o 
+libmfs.so: mfs.o
+	$(CC) $(CFLAGS) -shared -o $@ $<
 
-# this is a generic rule for .o files 
-%.o: %.c 
-	$(CC) $(OPTS) -c $< -o $@
+udp.o: udp.c
+	$(CC) $(CFLAGS) -c udp.c 
+
+server.o: server.c
+	$(CC) $(CFLAGS) -c server.c 
+
+server: server.o udp.o libmfs.so
+	$(CC) $(CFLAGS) -o server server.o udp.o -lmfs -L.
 
 clean:
-	rm -f server.o udp.o client.o server client
-
-
-
+	rm -f server.o udp.o client.o server mfs.o libmfs.so selftest selftest.o
