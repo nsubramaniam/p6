@@ -1,8 +1,8 @@
-#include "mfs.h"
 #include <stdio.h>
 #include <sys/select.h>
 #include <sys/time.h>
 #include "udp.h"
+#include "mfs.h"
 
 int sd, rc;
 struct sockaddr_in addr, addr2;
@@ -16,15 +16,17 @@ int MFS_Init(char* hostname, int port) {
 	rc = UDP_FillSockAddr(&addr, hostname, port); //contact server at specified port
 	assert(rc == 0);
 
+	details = (MFS_Details *)malloc(sizeof(MFS_Details));
+	
 	return 0;
 }
 
 int MFS_Lookup(int pinum, char* name) {
-	details->dirEnt->inum = pinum;
-	strcpy(details->dirEnt->name,name);
+	details->dirEnt.inum = pinum;
+	strcpy(details->dirEnt.name,name);
 	strcpy(details->operation,"lookup");
-    	
-	rc = UDP_Write(sd, &addr, (char *)&details, sizeof(MFS_Details));
+
+	rc = UDP_Write(sd, &addr, (char *)details, sizeof(MFS_Details));
 	if(rc > 0) {
 		fd_set r;
 		FD_ZERO(&r);
@@ -44,7 +46,7 @@ int MFS_Lookup(int pinum, char* name) {
 
 	return -1;
 }
-
+/*
 int MFS_Stat(int inum, MFS_Stat_t *m) {
 	details->dirEnt->inum = inum;
 	details->stat->type = m->type;
@@ -180,3 +182,4 @@ int MFS_Unlink(int pinum, char* name) {
 
 	return -1;
 }
+*/

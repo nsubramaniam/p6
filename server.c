@@ -32,7 +32,7 @@ int server_MFS_Init(char * fname)
 	stat[0].blocks = 1;
 
 	MFS_DirEnt_t dirDetails[DIRENTRIES];
-	dirDetails[0].inum = -1;
+	dirDetails[0].inum = 0;
 	strcpy(dirDetails[0].name,"..");
 
 	dirDetails[1].inum = 0;
@@ -75,6 +75,7 @@ int server_MFS_Lookup(int pinum, char *name)
 			}
 		}
 	}
+	
 	return -1;
 }
 
@@ -184,7 +185,7 @@ int server_MFS_Read(int inum, char * buffer, int block)
 	return -1;
 }
 
-/*
+
 int server_MFS_Creat(int pinum, int type, char *name)
 {
 	int i,j;
@@ -211,7 +212,6 @@ int server_MFS_Creat(int pinum, int type, char *name)
 	fsync(fd);
 	return -1;
 }
-*/
 
 int server_MFS_Unlink(int pinum, char *name)
 {
@@ -268,17 +268,19 @@ int main(int argc, char *argv[]) {
 	server_MFS_Init(fileSysImg);
 	
 	MFS_Details * details = (MFS_Details *)malloc(sizeof(MFS_Details));	
+	
 	metadataSize = DIRENTRIES*(sizeof(char) + sizeof(char) + sizeof(MFS_Stat_t));
 
 	printf("waiting in loop\n");
 	while (1) {
 		struct sockaddr_in s;
-		int rc = UDP_Read(sd, &s, (char *)&details, sizeof(MFS_Details)); //read message buffer from port sd
-		if (rc > 0) {
+		int rc = UDP_Read(sd, &s, (char *)details, sizeof(MFS_Details)); //read message buffer from port sd
+		if (rc > 0) {		
 		if(!strcmp(details->operation,"lookup"))
 		{
-			details->returnVal = server_MFS_Lookup(details->dirEnt->inum, details->dirEnt->name);
+			details->returnVal = server_MFS_Lookup(details->dirEnt.inum, details->dirEnt.name);
 		}
+		/*
 		else if(!strcmp(details->operation,"stat"))
 		{
 			details->returnVal = server_MFS_Stat(details->dirEnt->inum, details->stat);
@@ -291,18 +293,18 @@ int main(int argc, char *argv[]) {
 		{
 			details->returnVal = server_MFS_Read(details->dirEnt->inum, details->dirEnt->name, details->block);
 		}
-		/*
+		*/
 		else if(!strcmp(details->operation,"create"))
 		{
-			details->returnVal = server_MFS_Creat(details->dirEnt->inum, details->stat->type, details->dirEnt->type);
+			details->returnVal = server_MFS_Creat(details->dirEnt.inum, details->stat.type, details->dirEnt.name);
 		}
-		*/
+		/*
 		else if(!strcmp(details->operation,"unlink"))
 		{
 			details->returnVal = server_MFS_Unlink(details->dirEnt->inum, details->dirEnt->name);
 		}
-
-		rc = UDP_Write(sd, &s, (char *)&details, sizeof(MFS_Details)); //write message buffer to port sd
+		*/
+		rc = UDP_Write(sd, &s, (char *)details, sizeof(MFS_Details)); //write message buffer to port sd
 		}
 	}
 	return 0;

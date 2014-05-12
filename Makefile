@@ -1,7 +1,7 @@
 CC   = gcc 
 OPTS = -Wall
 CFLAGS=-g 
-all: server 
+all: server selftest
 
 client.o: client.c
 	$(CC) $(CFLAFS) -c client.c 
@@ -21,5 +21,7 @@ server.o: server.c
 server: server.o udp.o libmfs.so
 	$(CC) $(CFLAGS) -o server server.o udp.o -lmfs -L.
 
+selftest.o:selftest.c
+	$(CC) $(CFLAFS) $(OPTS) -c selftest.c 
 clean:
 	rm -f server.o udp.o client.o server mfs.o libmfs.so selftest selftest.o
