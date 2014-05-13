@@ -1,7 +1,7 @@
 CC   = gcc 
 OPTS = -Wall
 CFLAGS=-g 
-all: server selftest
+all: server selftest client.o
 
 client.o: client.c
 	$(CC) $(CFLAFS) -c client.c 

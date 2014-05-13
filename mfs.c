@@ -44,6 +44,7 @@ int MFS_Lookup(int pinum, char* name) {
 		}
 	}
 
+	printf("I am here\n");
 	return -1;
 }
 /*
@@ -128,14 +129,14 @@ int MFS_Read(int inum, char* buffer, int block) {
 
 	return -1;
 }	
-
+*/
 int MFS_Creat(int pinum, int type, char* name) {
-	details->dirEnt->inum = pinum;
-	strcpy(details->dirEnt->name,name);
-	details->stat->type = type;
+	details->dirEnt.inum = pinum;
+	strcpy(details->dirEnt.name,name);
+	details->stat.type = type;
 	strcpy(details->operation,"create");
     	
-	rc = UDP_Write(sd, &addr, (char *)&details, sizeof(MFS_Details));
+	rc = UDP_Write(sd, &addr, (char *)details, sizeof(MFS_Details));
 	if(rc > 0) {
 		fd_set r;
 		FD_ZERO(&r);
@@ -152,10 +153,10 @@ int MFS_Creat(int pinum, int type, char* name) {
 			printf("Client timed out\n");
 		}
 	}
-
+	printf("I am here\n");
 	return -1;
 }
-
+/*
 int MFS_Unlink(int pinum, char* name) {
 	details->dirEnt->inum = pinum;
 	strcpy(details->dirEnt->name,name);

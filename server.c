@@ -8,11 +8,26 @@
 #define BUFFER_SIZE (BLOCK_SIZE)
 #define DIRENTRIES 16
 #define BLOCKENTRIES 10
+#define DIRSIZE sizeof(MFS_DirEnt_t)
 
 int fd;
 char ibmp[BLOCK_SIZE],dbmp[BLOCK_SIZE];
 MFS_Stat_t stat[BLOCK_SIZE];
 int metadataSize;
+
+void flushMetaData()
+{
+	lseek(fd,0,SEEK_SET);
+	write(fd,(void *)ibmp,sizeof(char)*BLOCKS);
+
+	lseek(fd,sizeof(char)*BLOCKS,SEEK_SET);
+	write(fd,(void *)dbmp,sizeof(char)*BLOCK_SIZE);
+
+	lseek(fd,2*sizeof(char)*BLOCKS,SEEK_SET);
+	write(fd,(void *)stat,sizeof(MFS_Stat_t)*BLOCK_SIZE);
+	
+	fsync(fd);
+}
 
 int server_MFS_Init(char * fname)
 {
@@ -42,12 +57,11 @@ int server_MFS_Init(char * fname)
 	{
 		dirDetails[i].inum = -1;
 	}
+	
+	flushMetaData();
 
-	lseek(fd,0,SEEK_SET);
-	write(fd,(void *)ibmp,sizeof(char)*BLOCK_SIZE);
-	write(fd,(void *)dbmp,sizeof(char)*BLOCK_SIZE);
-	write(fd,(void *)stat,sizeof(MFS_Stat_t)*BLOCK_SIZE);
-	write(fd,(void *)dirDetails,sizeof(MFS_DirEnt_t)*DIRENTRIES);
+	lseek(fd,metadataSize,SEEK_SET);
+	write(fd,(void *)dirDetails,DIRSIZE*DIRENTRIES);
 	fsync(fd);
 
 	return 1;	
@@ -63,9 +77,9 @@ int server_MFS_Lookup(int pinum, char *name)
 			MFS_DirEnt_t * ptr = (MFS_DirEnt_t *)malloc(sizeof(MFS_DirEnt_t *));
 			for(j=0;j<DIRENTRIES;j++)
 			{
-				int offset = metadataSize + i * BLOCK_SIZE + j * sizeof(MFS_DirEnt_t);
+				int offset = metadataSize + i * BLOCK_SIZE + j * DIRSIZE;
 				lseek(fd,offset,SEEK_SET);
-				if(read(fd,ptr,sizeof(MFS_DirEnt_t) == sizeof(MFS_DirEnt_t)))
+				if(read(fd,ptr,DIRSIZE) == DIRSIZE)
 				{
 					if(!strcmp(ptr->name,name))
 						return ptr->inum;
@@ -191,25 +205,63 @@ int server_MFS_Creat(int pinum, int type, char *name)
 	int i,j;
 	for(i=0;i<BLOCK_SIZE;i++)
 	{
-		if(stat[i].inum == pinum)
+		if(stat[i].type==MFS_DIRECTORY)
 		{
-			for(j=0;j<BLOCK_SIZE;j++)
+			for(j=0;j<DIRENTRIES;j++)
 			{
-				if(ibmp[j]!=0)
+				MFS_DirEnt_t parentDir;	
+				int offset = metadataSize + i*BLOCK_SIZE + j*DIRSIZE;
+				lseek(fd,offset,SEEK_SET);
+				if(read(fd,&parentDir,DIRSIZE)==DIRSIZE)
 				{
-					ibmp[j]=1;
-					dbmp[j]=1;
-					stat[j]->type = type;
-					strcpy(stat[j].name,name);
-					stat[j]->size = BLOCK_SIZE;
-					stat[j]->blocks = 1;
-					return 0;
+					if(parentDir.inum==pinum)
+					{
+						ibmp[j]=1;
+						dbmp[j]=1;
+						stat[j].type = type;
+						if(type==MFS_DIRECTORY)
+						{
+							stat[j].size = BLOCK_SIZE;
+							stat[j].blocks = 1;
+						}
+
+						int offset = metadataSize + i*BLOCK_SIZE;
+						lseek(fd,offset,SEEK_SET);
+						while(read(fd,&parentDir,DIRSIZE)==DIRSIZE)
+							offset += DIRSIZE;
+						
+						parentDir.inum = j;
+						strcpy(parentDir.name,"name");
+
+						lseek(fd,offset,SEEK_SET);
+						write(fd,&parentDir,DIRSIZE);
+						
+						MFS_DirEnt_t dirDetails[DIRENTRIES];
+						dirDetails[0].inum = pinum;
+						strcpy(dirDetails[0].name,"..");
+
+						dirDetails[1].inum = j;
+						strcpy(dirDetails[1].name,".");
+
+						offset = metadataSize + j*BLOCK_SIZE;
+						lseek(fd,offset,SEEK_SET);
+						write(fd,dirDetails,DIRSIZE*DIRENTRIES);
+
+						lseek(fd,0,SEEK_SET);
+						write(fd,(void *)ibmp,sizeof(char)*BLOCK_SIZE);
+						write(fd,(void *)dbmp,sizeof(char)*BLOCK_SIZE);	
+						write(fd,(void *)stat,sizeof(MFS_Stat_t)*BLOCK_SIZE);
+	
+						fsync(fd);
+						return 0;
+					}
 				}
+				else
+					break;
 			}	
 		}
 	}
 
-	fsync(fd);
 	return -1;
 }
 
@@ -269,7 +321,7 @@ int main(int argc, char *argv[]) {
 	
 	MFS_Details * details = (MFS_Details *)malloc(sizeof(MFS_Details));	
 	
-	metadataSize = DIRENTRIES*(sizeof(char) + sizeof(char) + sizeof(MFS_Stat_t));
+	metadataSize = BLOCKS*(sizeof(char) + sizeof(char) + sizeof(MFS_Stat_t));
 
 	printf("waiting in loop\n");
 	while (1) {
